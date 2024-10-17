@@ -5,11 +5,14 @@ import com.cs203.smucode.models.User;
 import com.cs203.smucode.repositories.UserRepository;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * @author: gav
@@ -41,9 +44,26 @@ public class UserServiceImpl implements IUserService {
         return userRepository.save(user);
     }
 
+    @Override
+    @Transactional
+    public void updatePassword(String username, String oldPassword, String newPassword) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new UsernameNotFoundException("Invalid username"));
+
+        if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
+            throw new BadCredentialsException("Invalid password");
+        }
+
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+    }
+
     @Override   
     @Transactional
-    public void deleteUser(Long id) {
+    public void deleteUser(UUID id) {
+        if (!userRepository.existsById(id)) {
+            throw new UsernameNotFoundException("Invalid user");
+        }
         userRepository.deleteById(id);
     }
 }
