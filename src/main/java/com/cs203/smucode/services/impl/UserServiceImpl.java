@@ -58,6 +58,15 @@ public class UserServiceImpl implements IUserService {
         userRepository.save(user);
     }
 
+    @Override
+    @Transactional
+    public void updateEmail(UUID id, String email) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new UsernameNotFoundException("Invalid user"));
+        user.setEmail(email);
+        userRepository.save(user);
+    }
+
     @Override   
     @Transactional
     public void deleteUser(UUID id) {
