@@ -5,8 +5,6 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.UUID;
-
 /**
  * @author: gav
  * @version: 1.0
@@ -20,7 +18,8 @@ import java.util.UUID;
 public class User {
 
     @Id
-    private UUID id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
     @Column(unique = true)
     private String username;
@@ -28,8 +27,13 @@ public class User {
     @Column(unique = true)
     private String email;
     private String password;
+    private String profileImageUrl;
 
     @Enumerated(EnumType.STRING)
     private UserRole userRole;
 
+    // TrueSkill attributes
+    private double mu;
+    private double sigma;
+    private double skillIndex;
 }
