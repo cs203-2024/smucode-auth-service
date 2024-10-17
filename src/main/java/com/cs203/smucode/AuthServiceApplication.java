@@ -4,10 +4,10 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-public class AuthServiceForSmucodeApplication {
+public class AuthService {
 
 	public static void main(String[] args) {
-		SpringApplication.run(AuthServiceForSmucodeApplication.class, args);
+		SpringApplication.run(AuthService.class, args);
 	}
 
 }
