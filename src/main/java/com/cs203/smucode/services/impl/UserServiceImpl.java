@@ -46,9 +46,9 @@ public class UserServiceImpl implements IUserService {
 
     @Override
     @Transactional
-    public void updatePassword(String username, String oldPassword, String newPassword) {
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new UsernameNotFoundException("Invalid username"));
+    public void updatePassword(UUID id, String oldPassword, String newPassword) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new UsernameNotFoundException("Invalid UUID"));
 
         if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
             throw new BadCredentialsException("Invalid password");
@@ -58,20 +58,14 @@ public class UserServiceImpl implements IUserService {
         userRepository.save(user);
     }
 
-    @Override
-    @Transactional
-    public void updateEmail(UUID id, String email) {
-        User user = userRepository.findById(id)
-                .orElseThrow(() -> new UsernameNotFoundException("Invalid user"));
-        user.setEmail(email);
-        userRepository.save(user);
-    }
-
     @Override   
     @Transactional
-    public void deleteUser(UUID id) {
-        if (!userRepository.existsById(id)) {
-            throw new UsernameNotFoundException("Invalid user");
+    public void deleteUser(UUID id, String password) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new UsernameNotFoundException("Invalid UUID"));
+
+        if (!passwordEncoder.matches(password, user.getPassword())) {
+            throw new BadCredentialsException("Invalid password");
         }
         userRepository.deleteById(id);
     }
