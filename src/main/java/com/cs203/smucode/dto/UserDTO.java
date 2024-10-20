@@ -5,7 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import jakarta.validation.constraints.Pattern;
 
-public record UserDTO(
+public record UserDTO (
 
         @NotNull(message = "Username cannot be empty/null")
         String username,
@@ -18,7 +18,6 @@ public record UserDTO(
         @NotNull(message = "Email cannot be empty/null")
         @Email(message = "Invalid email format")
         String email,
-
 
         @NotNull(message = "Role cannot be empty/null")
         String role
