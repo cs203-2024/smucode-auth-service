@@ -1,4 +1,4 @@
-package com.cs203.smucode.models;
+package com.cs203.smucode.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotNull;
