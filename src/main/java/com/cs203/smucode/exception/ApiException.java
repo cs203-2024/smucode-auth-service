@@ -2,13 +2,14 @@ package com.cs203.smucode.exception;
 import org.springframework.http.HttpStatus;
 
 import java.time.ZonedDateTime;
+import java.util.List;
 
 public class ApiException {
-    private final String message;
+    private final List<String> message;
     private final HttpStatus httpStatus;
     private final ZonedDateTime timestamp;
 
-    public ApiException(String message,
+    public ApiException(List<String> message,
                         HttpStatus httpStatus,
                         ZonedDateTime timestamp) {
         this.message = message;
@@ -16,7 +17,7 @@ public class ApiException {
         this.timestamp = timestamp;
     }
 
-    public String getMessage() {
+    public List<String> getMessage() {
         return message;
     }
 
