@@ -50,9 +50,8 @@ public class SecurityConfiguration {
                 .requestMatchers(
                         "/api/auth/logout",
                         "/api/auth/change-password",
-                        "/api/auth/delete-account"
-                )
-                .hasAnyRole("PLAYER", "ADMIN")
+                        "/api/auth/delete-account")
+                .hasAuthority("SCOPE_ROLE_ADMIN")
                 .anyRequest()
                 .permitAll()
         );
@@ -61,6 +60,7 @@ public class SecurityConfiguration {
             session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
         );
 
+        http.oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()));
         http.csrf(AbstractHttpConfigurer::disable);
         http.cors(Customizer.withDefaults());
 

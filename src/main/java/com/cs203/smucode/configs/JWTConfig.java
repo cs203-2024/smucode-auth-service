@@ -1,12 +1,10 @@
 package com.cs203.smucode.configs;
 
 import com.cs203.smucode.utils.AWSUtil;
-import com.nimbusds.jose.crypto.RSASSASigner;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
-import org.bouncycastle.jcajce.provider.asymmetric.rsa.RSAUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -22,10 +20,12 @@ import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
-import java.util.UUID;
 
 @Configuration
 public class JWTConfig {
+    @Value("${jwt.id}")
+    private String keyId;
+
     @Bean
     public RSAPublicKey rsaPublicKey(
             @Value("${jwt.public.key}") String publicKeyString
@@ -69,7 +69,7 @@ public class JWTConfig {
     public RSAKey rsaKey(RSAPrivateKey privateKey, RSAPublicKey publicKey) {
         return new RSAKey.Builder(publicKey)
                 .privateKey(privateKey)
-                .keyID(UUID.randomUUID().toString())
+                .keyID(keyId)
                 .build();
     }
 
