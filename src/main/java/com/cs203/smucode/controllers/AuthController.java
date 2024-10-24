@@ -111,7 +111,11 @@ public class AuthController {
             userService.createUser(createdUser);
 
             // Talk to user service to create a profile for this user
-            userServiceProxy.createUserProfile(dto.username(), dto.email());
+            userServiceProxy.createUserProfile(
+                    createdUser.getId(),
+                    createdUser.getUsername(),
+                    createdUser.getEmail()
+            );
 
             return ResponseEntity.status(HttpStatus.CREATED)
                     .body(UserMapper.INSTANCE.userToUserDTO(createdUser));
