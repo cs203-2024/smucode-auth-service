@@ -1,1 +1,20 @@
-spring.application.name=auth service for smucode
+server:
+  port: 8000
+
+spring:
+  application:
+    name: auth-service
+
+eureka:
+  client:
+    enabled: false
+
+user:
+  service:
+    url: ${USER_SERVICE_URL:http://localhost:8080/api/users}
+
+jwt:
+  id: ${JWT_KEY_ID:c3e9666f-7744-4f50-ab86-4c99b841c01d}
+  expiration: ${JWT_EXPIRATION_TIME:60000}
+  public:
+    key: ${JWT_PUBLIC_KEY:MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvSBsDpYuAZP1xcTV6MusaZ0tNX863slQv09AjdChOOrHzsAf8fvlaVyRo1eXF6lMVc2NjQkJkMq1oGGgmlnF1bct/6yl9ndEnYEA0kt7CDT9q2JH+12wZu6C5cFPv9D0kWi+Bi33nu/jWyucFHLb+DInewvh3YgTWGNUz317di3aIPs8PJospOhjXKYOX6iKOrY7w47wVqI+n31daF39ySokqxslJTBBDB5zfTI0aiD5/+g4YHjtgg41flxuDUfo6FNSjjAK9MKKnN4TpLrXA3bcmckB9Qu3/b30BgSteXKhAaFjxDd6mY2uwvqzAxZEzEtpOMoMxHhYBtsnLldawwIDAQAB}
