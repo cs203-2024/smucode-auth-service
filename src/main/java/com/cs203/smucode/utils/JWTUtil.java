@@ -71,7 +71,7 @@ public class JWTUtil {
                                     .getAuthorities()
                                     .stream()
                                     .map(GrantedAuthority::getAuthority)
-                                    .collect(Collectors.toList())
+                                    .collect(Collectors.joining(" "))
                     )
                     .build();
 
