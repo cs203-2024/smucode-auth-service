@@ -1,5 +1,6 @@
 package com.cs203.smucode.services.impl;
 
+import com.cs203.smucode.proxies.UserServiceProxy;
 import com.cs203.smucode.services.IUserService;
 import com.cs203.smucode.models.User;
 import com.cs203.smucode.repositories.UserRepository;
@@ -23,11 +24,15 @@ import java.util.UUID;
 public class UserServiceImpl implements IUserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final UserServiceProxy userServiceProxy;
 
     @Autowired
-    public UserServiceImpl(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public UserServiceImpl(UserRepository userRepository,
+                           PasswordEncoder passwordEncoder,
+                           UserServiceProxy userServiceProxy) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.userServiceProxy = userServiceProxy;
     }
 
     @Override
@@ -42,6 +47,13 @@ public class UserServiceImpl implements IUserService {
     public void createUser(User user) {
         user.setPassword(passwordEncoder.encode(user.getPassword()));
         userRepository.save(user);
+
+        // Talk to user service to create a profile for this user
+        userServiceProxy.createUserProfile(
+                user.getId(),
+                user.getUsername(),
+                user.getEmail()
+        );
     }
 
     @Override
