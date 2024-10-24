@@ -7,13 +7,11 @@ import com.cs203.smucode.exception.ApiRequestException;
 import com.cs203.smucode.mappers.UserMapper;
 import com.cs203.smucode.models.User;
 import com.cs203.smucode.dto.UserDTO;
-import com.cs203.smucode.proxies.UserServiceProxy;
 import com.cs203.smucode.services.IUserService;
 import com.cs203.smucode.utils.JWTUtil;
+import com.nimbusds.jose.jwk.JWKSet;
 import jakarta.validation.Valid;
 import jakarta.validation.ValidationException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -36,21 +34,16 @@ import org.springframework.http.ResponseEntity;
 @RequestMapping("/api/auth")
 public class AuthController {
 
-    private static final Logger logger = LoggerFactory.getLogger(AuthController.class);
-
     private final IUserService userService;
     private final JWTUtil jwtUtil;
     private final AuthenticationManager authenticationManager;
-    private final UserServiceProxy userServiceProxy;
 
     @Autowired
     public AuthController(IUserService userService, JWTUtil jwtUtil,
-                          AuthenticationManager authenticationManager,
-                          UserServiceProxy userServiceProxy) {
+                          AuthenticationManager authenticationManager) {
         this.userService = userService;
         this.jwtUtil = jwtUtil;
         this.authenticationManager = authenticationManager;
-        this.userServiceProxy = userServiceProxy;
     }
 
     @PostMapping("/login")
@@ -110,13 +103,6 @@ public class AuthController {
             User createdUser = UserMapper.INSTANCE.userDTOtoUser(dto);
             userService.createUser(createdUser);
 
-            // Talk to user service to create a profile for this user
-            userServiceProxy.createUserProfile(
-                    createdUser.getId(),
-                    createdUser.getUsername(),
-                    createdUser.getEmail()
-            );
-
             return ResponseEntity.status(HttpStatus.CREATED)
                     .body(UserMapper.INSTANCE.userToUserDTO(createdUser));
         } catch (DataIntegrityViolationException e) {
@@ -150,7 +136,7 @@ public class AuthController {
 
     @PutMapping("/change-password")
     public ResponseEntity<String> resetPassword(@RequestBody @Valid UserCredentialsDTO dto) {
-        logger.info("change-password received" + dto.toString());
+
         if (dto.id() == null) {
             throw new ApiRequestException("UUID cannot be null or empty");
         }
@@ -169,5 +155,12 @@ public class AuthController {
         } catch (Exception e) {
             throw new ApiRequestException("An error occurred during password reset");
         }
+    }
+
+    @GetMapping("/.well-known/jwks.json")
+    public String getJwkSet() {
+
+        JWKSet jwkSet = new JWKSet(jwtUtil.getRsaKey());
+        return jwkSet.toJSONObject().toString();
     }
 }

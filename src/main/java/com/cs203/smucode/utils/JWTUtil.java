@@ -1,33 +1,21 @@
 package com.cs203.smucode.utils;
 
-import com.nimbusds.jose.JOSEException;
-import com.nimbusds.jose.JWSAlgorithm;
-import com.nimbusds.jose.JWSHeader;
-import com.nimbusds.jose.crypto.RSASSASigner;
-import com.nimbusds.jwt.JWTClaimsSet;
-import com.nimbusds.jwt.SignedJWT;
-import jakarta.annotation.PostConstruct;
-import java.security.*;
-import java.security.spec.InvalidKeySpecException;
-import java.security.spec.PKCS8EncodedKeySpec;
+import com.nimbusds.jose.jwk.RSAKey;
+
 import java.time.Instant;
-import java.util.Base64;
-import java.util.Date;
 import java.util.stream.Collectors;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
+import lombok.Getter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.stereotype.Component;
-import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 
 /**
  * @author: gav
@@ -35,17 +23,21 @@ import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
  * @since: 24-09-18
  * @description: Utility class for JWT operations
  */
+@Getter
 @Component
 public class JWTUtil {
 
     @Value("${jwt.expiration}")
     private long expirationTime;
 
+    private final RSAKey rsaKey;
+
     private final JwtEncoder jwtEncoder;
 
     @Autowired
-    public JWTUtil(JwtEncoder jwtEncoder) {
+    public JWTUtil(JwtEncoder jwtEncoder, RSAKey rsaKey) {
         this.jwtEncoder = jwtEncoder;
+        this.rsaKey = rsaKey;
     }
 
     /**
