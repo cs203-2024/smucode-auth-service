@@ -23,12 +23,23 @@ public class UserServiceProxy {
     }
 
     public void createUserProfile(UUID id, String username, String email) {
-        String createProfileUrl = userUrl + "/create";
+        String createProfileUrl = userUrl + "/profile/create";
         UserIdentificationDTO dto = new UserIdentificationDTO(id, username, email);
 
         ResponseEntity<String> response = restTemplate.postForEntity(createProfileUrl, dto, String.class);
 
         if (response.getStatusCode() != HttpStatus.CREATED) {
+            throw new RuntimeException("Error creating user profile: " + dto);
+        }
+    }
+
+    public void deleteUserProfile(UUID id, String username, String email) {
+        String deleteProfileUrl = userUrl + "/profile/delete";
+        UserIdentificationDTO dto = new UserIdentificationDTO(id, username, email);
+
+        ResponseEntity<String> response = restTemplate.postForEntity(deleteProfileUrl, dto, String.class);
+
+        if (response.getStatusCode() != HttpStatus.OK) {
             throw new RuntimeException("Error creating user profile: " + dto);
         }
     }
