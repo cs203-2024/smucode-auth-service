@@ -2,11 +2,8 @@ package com.cs203.smucode.configs;
 
 import com.cs203.smucode.services.impl.AuthUserServiceImpl;
 
-import java.security.KeyPair;
-import java.security.KeyPairGenerator;
 import java.util.List;
 
-import com.nimbusds.jose.jwk.source.JWKSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -21,7 +18,6 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
