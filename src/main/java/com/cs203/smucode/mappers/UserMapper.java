@@ -26,6 +26,6 @@ public interface UserMapper {
 
     @Named("userRoleToRole")
     default String userTypeToString(UserRole role) {
-        return role.toString();
+        return "ROLE_" + role.toString();
     }
 }
