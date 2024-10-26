@@ -25,7 +25,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class JWTUtil {
 
-    @Value("${jwt.expiration}")
+    @Value("${jwt.access.duration}")
     private long expirationTime;
 
     private final RSAKey rsaKey;
