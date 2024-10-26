@@ -37,5 +37,5 @@ public class User {
     private UserRole userRole;
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<JWTRefreshToken> refreshTokens;
+    private List<RefreshToken> refreshTokens;
 }
