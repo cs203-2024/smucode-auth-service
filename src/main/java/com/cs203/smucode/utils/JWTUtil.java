@@ -8,8 +8,6 @@ import java.util.stream.Collectors;
 import lombok.Getter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.authentication.AuthenticationServiceException;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
@@ -43,20 +41,17 @@ public class JWTUtil {
     /**
      * Generates a JWT token post-authentication.
      *
-     * @param auth the Authentication object containing user details
+     * @param userDetails the UserDetails object containing user details (authorities, etc)
      * @return a String representation of the signed JWT token (for Bearer)
      */
-    public String generateToken(Authentication auth) {
-        if (!(auth.getPrincipal() instanceof UserDetails userDetails)) {
-            throw new AuthenticationServiceException("UserDetails not found, got " + auth.getPrincipal().getClass().getName());
-        }
+    public String generateToken(UserDetails userDetails) {
 
         try {
             JwtClaimsSet claimsSet = JwtClaimsSet.builder()
                     .issuer("smucode-auth-service")
                     .issuedAt(Instant.now())
                     .expiresAt(Instant.now().plusSeconds(expirationTime))
-                    .subject(auth.getName())
+                    .subject(userDetails.getUsername())
                     .claim(
                             "scope",
                             userDetails
@@ -71,5 +66,9 @@ public class JWTUtil {
         } catch (Exception e) {
             throw new RuntimeException("Something went wrong", e);
         }
+    }
+
+    public RSAKey getRSAKey() {
+        return this.rsaKey;
     }
 }
