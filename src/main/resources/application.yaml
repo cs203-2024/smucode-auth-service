@@ -18,6 +18,8 @@ user:
     url: ${USER_SERVICE_URL:http://localhost:8080/api/users}
 
 jwt:
+  refresh:
+    duration: ${JWT_REFRESH_DURATION:120}
   id: ${JWT_KEY_ID:c3e9666f-7744-4f50-ab86-4c99b841c01d}
   expiration: ${JWT_EXPIRATION_TIME:60000}
   public:
