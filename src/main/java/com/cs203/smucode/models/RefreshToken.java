@@ -9,17 +9,15 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "user_refresh")
+@Table(name = "users_refresh")
 @Data
-@AllArgsConstructor
 @NoArgsConstructor
-public class JWTRefreshToken {
+public class RefreshToken {
 
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
     private UUID id;
 
-    @GeneratedValue(strategy = GenerationType.AUTO)
     @Column(nullable = false)
     private UUID token;
 
