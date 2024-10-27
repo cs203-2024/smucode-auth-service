@@ -64,7 +64,7 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<JWTResponseDTO> login(@RequestBody @Valid LoginRequestDTO dto) {
+    public ResponseEntity<LoginResponseDTO> login(@RequestBody @Valid LoginRequestDTO dto) {
         if (dto.username() == null || dto.username().isEmpty()) {
             throw new ApiRequestException("Username cannot be null or empty");
         }
@@ -85,35 +85,28 @@ public class AuthController {
             String accessToken = tokenService.createAccessToken(userDetails);
             String refreshToken = tokenService.createRefreshToken(dto.username());
 
-            ResponseCookie refreshTokenCookie = ResponseCookie.from("refreshToken", refreshToken)
-                    .httpOnly(true)
-                    .secure(httpsEnabled)
-                    .path("/auth/refresh")  // Define the path for refresh endpoint
-                    .maxAge(refreshDurationInMinutes * TimeConstants.SECONDS)  // Set expiration time
-//                    .sameSite("Strict")  // Optional: prevent CSRF on cross-site requests
-                    .build();
+            ResponseCookie refreshTokenCookie = this.buildRefreshTokenForCookie(
+                    refreshToken,refreshDurationInMinutes * TimeConstants.SECONDS
+            );
+
+            ResponseCookie accessTokenCookie = this.buildAccessTokenForCookie(accessToken);
 
             UserDTO userDTO = UserMapper.INSTANCE.userToUserDTO(userService.getUserByUsername(dto.username()));
 
             return ResponseEntity.ok()
                     .header(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString())
-                    .body(new JWTResponseDTO("success",
-                            userDTO, accessToken)
-                    );
+                    .header(HttpHeaders.SET_COOKIE, accessTokenCookie.toString())
+                    .body(new LoginResponseDTO("success", userDTO));
         } catch (UsernameNotFoundException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(new JWTResponseDTO("Invalid username or password",
-                            null, null)
-                    );
+                    .body(new LoginResponseDTO("Invalid username or password", null));
         } catch (BadCredentialsException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(new JWTResponseDTO("Ensure that you have typed the username and password correctly",
-                            null, null)
-                    );
+                    .body(new LoginResponseDTO("Ensure that you have typed the username and password correctly", null));
         } catch (ApiRequestException e) {
             throw e;
         } catch (Exception e) {
-            throw new ApiRequestException("An error occurred during login", e);
+            throw new ApiRequestException("An error occurred during login");
         }
     }
 
@@ -155,13 +148,9 @@ public class AuthController {
             );
 
             String refreshToken = new RefreshToken().toString();
-            ResponseCookie refreshTokenCookie = ResponseCookie.from("refreshToken", refreshToken)
-                    .httpOnly(true)
-                    .secure(httpsEnabled)
-                    .path("/auth/refresh")  // Define the path for refresh endpoint
-                    .maxAge(TimeConstants.NOW)  // Set expiration time to 0 to delete it
-//                    .sameSite("Strict")  // Optional: prevent CSRF on cross-site requests
-                    .build();
+            ResponseCookie refreshTokenCookie = this.buildRefreshTokenForCookie(
+                    refreshToken, TimeConstants.NOW
+            );
 
             return ResponseEntity.ok()
                     .header(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString())
@@ -216,7 +205,7 @@ public class AuthController {
     }
 
     @PostMapping("/refresh")
-    public ResponseEntity<JWTResponseDTO> refreshAccessToken(
+    public ResponseEntity<LoginResponseDTO> refreshAccessToken(
             @CookieValue(value="refreshToken", required = false) String tokenId) {
         try {
             RefreshToken refreshToken = tokenService.validateRefreshToken(
@@ -233,14 +222,38 @@ public class AuthController {
             );
             UserDTO userDTO = UserMapper.INSTANCE.userToUserDTO(user);
 
-            return ResponseEntity.ok(new JWTResponseDTO(
-                    "success",
-                    userDTO, tokenService.createAccessToken(userDetails))
+            String accessToken = tokenService.createAccessToken(userDetails);
+
+            ResponseCookie accessTokenCookie = this.buildAccessTokenForCookie(
+                    accessToken
             );
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.SET_COOKIE, accessTokenCookie.toString())
+                    .body(new LoginResponseDTO("success", userDTO));
         } catch (InvalidTokenException e) {
             throw new ApiRequestException(e.getMessage());
         } catch (Exception e) {
             throw new ApiRequestException("Error refreshing access token");
         }
+    }
+
+    private ResponseCookie buildRefreshTokenForCookie(String attributeValue, long age) {
+        return ResponseCookie.from("refreshToken", attributeValue)
+                .httpOnly(true)
+                .secure(httpsEnabled)
+                .path("/auth/refresh")  // Define the path that requires cookie sending
+                .maxAge(age)  // Set expiration time
+//                    .sameSite("Strict")  // Optional: prevent CSRF on cross-site requests
+                .build();
+    }
+
+    private ResponseCookie buildAccessTokenForCookie(String attributeValue) {
+        return ResponseCookie.from("accessToken", attributeValue)
+                .httpOnly(true)
+                .secure(httpsEnabled)
+                .path("/")  // Define the path that requires cookie sending
+//                    .sameSite("Strict")  // Optional: prevent CSRF on cross-site requests
+                .build();
     }
 }
