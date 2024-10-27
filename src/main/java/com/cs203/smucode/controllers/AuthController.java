@@ -247,7 +247,7 @@ public class AuthController {
         return ResponseCookie.from("refreshToken", attributeValue)
                 .httpOnly(true)
                 .secure(httpsEnabled)
-                .path("/auth/refresh")  // Define the path that requires cookie sending
+                .path("/api/auth/refresh")  // Define the path that requires cookie sending
                 .maxAge(age)  // Set expiration time
 //                    .sameSite("Strict")  // Optional: prevent CSRF on cross-site requests
                 .build();
