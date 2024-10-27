@@ -47,6 +47,9 @@ public class AuthController {
     @Value("${jwt.refresh.duration}")
     private long refreshDurationInMinutes;
 
+    @Value("${jwt.access.duration}")
+    private long accessDurationInSeconds;
+
     private final IUserService userService;
     private final ITokenService tokenService;
     private final AuthenticationManager authenticationManager;
@@ -89,7 +92,9 @@ public class AuthController {
                     refreshToken,refreshDurationInMinutes * TimeConstants.SECONDS
             );
 
-            ResponseCookie accessTokenCookie = this.buildAccessTokenForCookie(accessToken);
+            ResponseCookie accessTokenCookie = this.buildAccessTokenForCookie(
+                    accessToken, accessDurationInSeconds
+            );
 
             UserDTO userDTO = UserMapper.INSTANCE.userToUserDTO(userService.getUserByUsername(dto.username()));
 
@@ -225,7 +230,7 @@ public class AuthController {
             String accessToken = tokenService.createAccessToken(userDetails);
 
             ResponseCookie accessTokenCookie = this.buildAccessTokenForCookie(
-                    accessToken
+                    accessToken, accessDurationInSeconds
             );
 
             return ResponseEntity.ok()
@@ -248,12 +253,13 @@ public class AuthController {
                 .build();
     }
 
-    private ResponseCookie buildAccessTokenForCookie(String attributeValue) {
+    private ResponseCookie buildAccessTokenForCookie(String attributeValue, long age) {
         return ResponseCookie.from("accessToken", attributeValue)
                 .httpOnly(true)
                 .secure(httpsEnabled)
                 .path("/")  // Define the path that requires cookie sending
 //                    .sameSite("Strict")  // Optional: prevent CSRF on cross-site requests
+                .maxAge(age)
                 .build();
     }
 }
