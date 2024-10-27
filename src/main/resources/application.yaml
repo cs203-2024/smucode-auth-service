@@ -17,6 +17,8 @@ user:
   service:
     url: ${USER_SERVICE_URL:http://localhost:8080/api/users}
 
+https:
+  enabled: ${HTTPS_ENABLED:false}
 jwt:
   refresh:
     duration: ${JWT_REFRESH_DURATION:120} # this in minutes
