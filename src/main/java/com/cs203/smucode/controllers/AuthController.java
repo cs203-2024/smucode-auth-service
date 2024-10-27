@@ -152,13 +152,19 @@ public class AuthController {
                     UUID.fromString(refreshTokenId)
             );
 
-            String refreshToken = new RefreshToken().toString();
+            String refreshToken = "destroyedRefresh";
             ResponseCookie refreshTokenCookie = this.buildRefreshTokenForCookie(
                     refreshToken, TimeConstants.NOW
             );
 
+            String accessToken = "destroyedAccess";
+            ResponseCookie accessTokenCookie = this.buildRefreshTokenForCookie(
+                    accessToken, TimeConstants.NOW
+            );
+
             return ResponseEntity.ok()
                     .header(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString())
+                    .header(HttpHeaders.SET_COOKIE, accessTokenCookie.toString())
                     .body("User logged out successfully");
         } catch (Exception e) {
             throw new ApiRequestException("An error occurred during logout");
