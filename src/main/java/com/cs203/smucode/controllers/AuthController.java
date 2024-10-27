@@ -1,28 +1,35 @@
 package com.cs203.smucode.controllers;
 
-import com.cs203.smucode.dto.JWTResponseDTO;
-import com.cs203.smucode.dto.LoginRequestDTO;
-import com.cs203.smucode.dto.UserCredentialsDTO;
+import com.cs203.smucode.constants.TimeConstants;
+import com.cs203.smucode.dto.*;
 import com.cs203.smucode.exception.ApiRequestException;
+import com.cs203.smucode.exception.InvalidTokenException;
 import com.cs203.smucode.mappers.UserMapper;
+import com.cs203.smucode.models.RefreshToken;
 import com.cs203.smucode.models.User;
-import com.cs203.smucode.dto.UserDTO;
+import com.cs203.smucode.services.ITokenService;
 import com.cs203.smucode.services.IUserService;
-import com.cs203.smucode.utils.JWTUtil;
 import com.nimbusds.jose.jwk.JWKSet;
 import jakarta.validation.Valid;
 import jakarta.validation.ValidationException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseCookie;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.client.ResourceAccessException;
+
+import java.util.UUID;
 
 /**
  * @author: gav
@@ -34,20 +41,33 @@ import org.springframework.http.ResponseEntity;
 @RequestMapping("/api/auth")
 public class AuthController {
 
+    @Value("${https.enabled}")
+    private boolean httpsEnabled;
+
+    @Value("${jwt.refresh.duration}")
+    private long refreshDurationInMinutes;
+
+    @Value("${jwt.access.duration}")
+    private long accessDurationInSeconds;
+
     private final IUserService userService;
-    private final JWTUtil jwtUtil;
+    private final ITokenService tokenService;
     private final AuthenticationManager authenticationManager;
+    private final UserDetailsService userDetailsService;
 
     @Autowired
-    public AuthController(IUserService userService, JWTUtil jwtUtil,
-                          AuthenticationManager authenticationManager) {
+    public AuthController(IUserService userService,
+                          AuthenticationManager authenticationManager,
+                          ITokenService tokenService,
+                          UserDetailsService userDetailsService) {
         this.userService = userService;
-        this.jwtUtil = jwtUtil;
         this.authenticationManager = authenticationManager;
+        this.tokenService = tokenService;
+        this.userDetailsService = userDetailsService;
     }
 
     @PostMapping("/login")
-    public ResponseEntity<JWTResponseDTO> login(@RequestBody @Valid LoginRequestDTO dto) {
+    public ResponseEntity<LoginResponseDTO> login(@RequestBody @Valid LoginRequestDTO dto) {
         if (dto.username() == null || dto.username().isEmpty()) {
             throw new ApiRequestException("Username cannot be null or empty");
         }
@@ -61,29 +81,37 @@ public class AuthController {
                     new UsernamePasswordAuthenticationToken(dto.username(), dto.password())
             );
 
-            SecurityContextHolder.getContext().setAuthentication(authentication);
+            if (!(authentication.getPrincipal() instanceof UserDetails userDetails)) {
+                throw new IllegalArgumentException("Expected userDetails, got" + authentication.getPrincipal().getClass().getName());
+            }
+
+            String accessToken = tokenService.createAccessToken(userDetails);
+            String refreshToken = tokenService.createRefreshToken(dto.username());
+
+            ResponseCookie refreshTokenCookie = this.buildRefreshTokenForCookie(
+                    refreshToken,refreshDurationInMinutes * TimeConstants.SECONDS
+            );
+
+            ResponseCookie accessTokenCookie = this.buildAccessTokenForCookie(
+                    accessToken, accessDurationInSeconds
+            );
+
             UserDTO userDTO = UserMapper.INSTANCE.userToUserDTO(userService.getUserByUsername(dto.username()));
 
-            return ResponseEntity.ok(new JWTResponseDTO(
-                    "success",
-                    userDTO, jwtUtil.generateToken(authentication))
-            );
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString())
+                    .header(HttpHeaders.SET_COOKIE, accessTokenCookie.toString())
+                    .body(new LoginResponseDTO("success", userDTO));
         } catch (UsernameNotFoundException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(new JWTResponseDTO(
-                            "Invalid username or password",
-                            null, null)
-                    );
+                    .body(new LoginResponseDTO("Invalid username or password", null));
         } catch (BadCredentialsException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(new JWTResponseDTO(
-                            "Ensure that you have typed the username and password correctly",
-                            null, null)
-                    );
+                    .body(new LoginResponseDTO("Ensure that you have typed the username and password correctly", null));
         } catch (ApiRequestException e) {
             throw e;
         } catch (Exception e) {
-            throw new ApiRequestException("An error occurred during login", e);
+            throw new ApiRequestException("An error occurred during login");
         }
     }
 
@@ -106,18 +134,35 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.CREATED)
                     .body(UserMapper.INSTANCE.userToUserDTO(createdUser));
         } catch (DataIntegrityViolationException e) {
-            throw new ApiRequestException("That username/email already exists, please try another", e);
+            throw new ApiRequestException("That username/email already exists, please try another");
         } catch (ValidationException e) {
             throw new ApiRequestException(e.getMessage());
+        } catch (ResourceAccessException e) {
+            throw new ApiRequestException("Something went wrong on our end, please try again");
         } catch (Exception e) {
             throw new ApiRequestException("An error occurred during signup");
         }
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<String> logout() {
-        //logout logic here?
-        return ResponseEntity.ok("User logged out successfully");
+    public ResponseEntity<String> logout(
+            @CookieValue(value="refreshToken", required = false) String refreshTokenId) {
+        try {
+            tokenService.blacklistRefreshToken(
+                    UUID.fromString(refreshTokenId)
+            );
+
+            String refreshToken = new RefreshToken().toString();
+            ResponseCookie refreshTokenCookie = this.buildRefreshTokenForCookie(
+                    refreshToken, TimeConstants.NOW
+            );
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString())
+                    .body("User logged out successfully");
+        } catch (Exception e) {
+            throw new ApiRequestException("An error occurred during logout");
+        }
     }
 
     @DeleteMapping("/delete-account")
@@ -160,7 +205,61 @@ public class AuthController {
     @GetMapping("/.well-known/jwks.json")
     public String getJwkSet() {
 
-        JWKSet jwkSet = new JWKSet(jwtUtil.getRsaKey());
+        JWKSet jwkSet = new JWKSet(tokenService.getJWTUtil().getRSAKey());
         return jwkSet.toJSONObject().toString();
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<LoginResponseDTO> refreshAccessToken(
+            @CookieValue(value="refreshToken", required = false) String tokenId) {
+        try {
+            RefreshToken refreshToken = tokenService.validateRefreshToken(
+                    UUID.fromString(tokenId)
+            );
+
+            if (refreshToken == null) {
+                throw new InvalidTokenException("Invalid refresh token");
+            }
+
+            User user = refreshToken.getUser();
+            UserDetails userDetails = userDetailsService.loadUserByUsername(
+                    user.getUsername()
+            );
+            UserDTO userDTO = UserMapper.INSTANCE.userToUserDTO(user);
+
+            String accessToken = tokenService.createAccessToken(userDetails);
+
+            ResponseCookie accessTokenCookie = this.buildAccessTokenForCookie(
+                    accessToken, accessDurationInSeconds
+            );
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.SET_COOKIE, accessTokenCookie.toString())
+                    .body(new LoginResponseDTO("success", userDTO));
+        } catch (InvalidTokenException e) {
+            throw new ApiRequestException(e.getMessage());
+        } catch (Exception e) {
+            throw new ApiRequestException("Error refreshing access token");
+        }
+    }
+
+    private ResponseCookie buildRefreshTokenForCookie(String attributeValue, long age) {
+        return ResponseCookie.from("refreshToken", attributeValue)
+                .httpOnly(true)
+                .secure(httpsEnabled)
+                .path("/auth/refresh")  // Define the path that requires cookie sending
+                .maxAge(age)  // Set expiration time
+//                    .sameSite("Strict")  // Optional: prevent CSRF on cross-site requests
+                .build();
+    }
+
+    private ResponseCookie buildAccessTokenForCookie(String attributeValue, long age) {
+        return ResponseCookie.from("accessToken", attributeValue)
+                .httpOnly(true)
+                .secure(httpsEnabled)
+                .path("/")  // Define the path that requires cookie sending
+//                    .sameSite("Strict")  // Optional: prevent CSRF on cross-site requests
+                .maxAge(age)
+                .build();
     }
 }
