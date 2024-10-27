@@ -12,6 +12,7 @@ import java.util.UUID;
 @Table(name = "users_refresh")
 @Data
 @NoArgsConstructor
+@AllArgsConstructor
 public class RefreshToken {
 
     @Id

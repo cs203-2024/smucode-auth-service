@@ -21,7 +21,7 @@ import java.util.UUID;
 public class TokenServiceImpl implements ITokenService {
 
     @Value("${jwt.refresh.duration}")
-    private long REFRESH_TOKEN_VALIDITY;
+    private long refreshTokenValidity;
 
     private final RefreshTokenRepository refreshTokenRepository;
     private final UserRepository userRepository;
@@ -47,7 +47,7 @@ public class TokenServiceImpl implements ITokenService {
 
         refreshToken.setToken(tokenId);
         refreshToken.setUser(user);
-        refreshToken.setExpiresAt(OffsetDateTime.now().plus(Duration.ofMinutes(REFRESH_TOKEN_VALIDITY)));
+        refreshToken.setExpiresAt(OffsetDateTime.now().plus(Duration.ofMinutes(refreshTokenValidity)));
 
         refreshTokenRepository.save(refreshToken);
         return refreshToken.getToken().toString();
