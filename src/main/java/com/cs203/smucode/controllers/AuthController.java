@@ -183,13 +183,13 @@ public class AuthController {
     }
 
     @DeleteMapping("/delete-account")
-    public ResponseEntity<String> deleteAccount(@RequestBody @Valid UserCredentialsDTO dto) {
-        if (dto.id() == null) {
-            throw new ApiRequestException("UUID cannot be null or empty");
+    public ResponseEntity<String> deleteAccount(@RequestBody @Valid LoginRequestDTO dto) {
+        if (dto.username() == null) {
+            throw new ApiRequestException("Username cannot be null or empty");
         }
 
         try {
-            userService.deleteUser(dto.id(), dto.oldPassword());
+            userService.deleteUser(dto.username(), dto.password());
             return ResponseEntity.ok("User deleted successfully");
         } catch (Exception e) {
             throw new ApiRequestException("An error occurred during delete account");
@@ -199,8 +199,8 @@ public class AuthController {
     @PutMapping("/change-password")
     public ResponseEntity<String> resetPassword(@RequestBody @Valid UserCredentialsDTO dto) {
 
-        if (dto.id() == null) {
-            throw new ApiRequestException("UUID cannot be null or empty");
+        if (dto.username() == null) {
+            throw new ApiRequestException("Username cannot be null or empty");
         }
 
         if (dto.oldPassword() == null || dto.oldPassword().isEmpty()) {
@@ -212,7 +212,7 @@ public class AuthController {
         }
 
         try {
-            userService.updatePassword(dto.id(), dto.oldPassword(), dto.newPassword());
+            userService.updatePassword(dto.username(), dto.oldPassword(), dto.newPassword());
             return ResponseEntity.ok("Password changed successfully");
         } catch (Exception e) {
             throw new ApiRequestException("An error occurred during password reset");
