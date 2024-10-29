@@ -29,6 +29,9 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.ResourceAccessException;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -88,7 +91,7 @@ public class AuthController {
             String accessToken = tokenService.createAccessToken(userDetails);
             String refreshToken = tokenService.createRefreshToken(dto.username());
 
-            ResponseCookie refreshTokenCookie = this.buildRefreshTokenForCookie(
+            List<ResponseCookie> refreshTokenCookies = this.buildRefreshTokenForCookie(
                     refreshToken,refreshDurationInMinutes * TimeConstants.SECONDS
             );
 
@@ -99,8 +102,12 @@ public class AuthController {
             UserDTO userDTO = UserMapper.INSTANCE.userToUserDTO(userService.getUserByUsername(dto.username()));
 
             return ResponseEntity.ok()
-                    .header(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString())
-                    .header(HttpHeaders.SET_COOKIE, accessTokenCookie.toString())
+                    .headers(headers -> {
+                        for (ResponseCookie cookie : refreshTokenCookies) {
+                            headers.add(HttpHeaders.SET_COOKIE, cookie.toString());
+                        }
+                        headers.add(HttpHeaders.SET_COOKIE, accessTokenCookie.toString());
+                    })
                     .body(new LoginResponseDTO("success", userDTO));
         } catch (UsernameNotFoundException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
@@ -153,18 +160,22 @@ public class AuthController {
             );
 
             String refreshToken = "destroyedRefresh";
-            ResponseCookie refreshTokenCookie = this.buildRefreshTokenForCookie(
+            List<ResponseCookie> refreshTokenCookies = this.buildRefreshTokenForCookie(
                     refreshToken, TimeConstants.NOW
             );
 
             String accessToken = "destroyedAccess";
-            ResponseCookie accessTokenCookie = this.buildRefreshTokenForCookie(
+            ResponseCookie accessTokenCookie = this.buildAccessTokenForCookie(
                     accessToken, TimeConstants.NOW
             );
 
             return ResponseEntity.ok()
-                    .header(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString())
-                    .header(HttpHeaders.SET_COOKIE, accessTokenCookie.toString())
+                    .headers(headers -> {
+                        for (ResponseCookie cookie : refreshTokenCookies) {
+                            headers.add(HttpHeaders.SET_COOKIE, cookie.toString());
+                        }
+                        headers.add(HttpHeaders.SET_COOKIE, accessTokenCookie.toString());
+                    })
                     .body("User logged out successfully");
         } catch (Exception e) {
             throw new ApiRequestException("An error occurred during logout");
@@ -210,9 +221,7 @@ public class AuthController {
 
     @GetMapping("/.well-known/jwks.json")
     public String getJwkSet() {
-
-        JWKSet jwkSet = new JWKSet(tokenService.getJWTUtil().getRSAKey());
-        return jwkSet.toJSONObject().toString();
+        return new JWKSet(tokenService.getJWTUtil().getRSAKey()).toJSONObject().toString();
     }
 
     @PostMapping("/refresh")
@@ -249,14 +258,20 @@ public class AuthController {
         }
     }
 
-    private ResponseCookie buildRefreshTokenForCookie(String attributeValue, long age) {
-        return ResponseCookie.from("refreshToken", attributeValue)
-                .httpOnly(true)
-                .secure(httpsEnabled)
-                .path("/api/auth/refresh")  // Define the path that requires cookie sending
-                .maxAge(age)  // Set expiration time
+    private List<ResponseCookie> buildRefreshTokenForCookie(String attributeValue, long age) {
+        List<String> paths = List.of("/api/auth/refresh", "/api/auth/logout");
+        List<ResponseCookie> cookies = new ArrayList<>();
+        for (String path : paths) {
+            cookies.add(ResponseCookie.from("refreshToken", attributeValue)
+                    .httpOnly(true)
+                    .secure(httpsEnabled)
+                    .path(path)  // Define the path that requires cookie sending
+                    .maxAge(age)  // Set expiration time
 //                    .sameSite("Strict")  // Optional: prevent CSRF on cross-site requests
-                .build();
+                    .build()
+            );
+        }
+        return cookies;
     }
 
     private ResponseCookie buildAccessTokenForCookie(String attributeValue, long age) {
