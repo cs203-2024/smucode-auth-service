@@ -47,7 +47,7 @@ public class SecurityConfiguration {
                         "/api/auth/logout",
                         "/api/auth/change-password",
                         "/api/auth/delete-account")
-                .hasAnyAuthority("SCOPE_ROLE_ADMIN", "SCOPE_ROLE_USER")
+                .authenticated()
                 .anyRequest()
                 .permitAll()
         );
