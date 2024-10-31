@@ -40,7 +40,7 @@ public class UserServiceProxy {
         ResponseEntity<String> response = restTemplate.postForEntity(deleteProfileUrl, dto, String.class);
 
         if (response.getStatusCode() != HttpStatus.OK) {
-            throw new RuntimeException("Error creating user profile: " + dto);
+            throw new RuntimeException("Error deleting user profile: " + dto);
         }
     }
 

@@ -79,6 +79,7 @@ public class UserServiceImpl implements IUserService {
         if (!passwordEncoder.matches(password, user.getPassword())) {
             throw new BadCredentialsException("Invalid password");
         }
+        userServiceProxy.deleteUserProfile(user.getId(), user.getUsername(), user.getEmail());
         userRepository.deleteByUsername(username);
     }
 }
