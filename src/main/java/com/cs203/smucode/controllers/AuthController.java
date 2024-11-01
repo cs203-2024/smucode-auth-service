@@ -214,6 +214,8 @@ public class AuthController {
         try {
             userService.updatePassword(dto.username(), dto.oldPassword(), dto.newPassword());
             return ResponseEntity.ok("Password changed successfully");
+        } catch (BadCredentialsException e) {
+            throw new ApiRequestException(e.getMessage());
         } catch (Exception e) {
             throw new ApiRequestException("An error occurred during password reset");
         }
