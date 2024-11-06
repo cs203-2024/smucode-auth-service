@@ -175,6 +175,7 @@
 						<exclude>**/mappers/**/*</exclude>
 						<exclude>**/utils/**/*</exclude>
 						<exclude>com/cs203/smucode/AuthServiceApplication.class</exclude>
+						<exclude>com/cs203/smucode/configs/JWTConfig.class</exclude>
 						<exclude>**/aspects/**/*</exclude>
 					</excludes>
 				</configuration>
