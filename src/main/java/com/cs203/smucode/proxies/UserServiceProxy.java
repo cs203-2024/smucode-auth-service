@@ -1,47 +1,18 @@
 package com.cs203.smucode.proxies;
 
 import com.cs203.smucode.dto.UserIdentificationDTO;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import jakarta.validation.Valid;
+import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.bind.annotation.PostMapping;
 
-import java.util.UUID;
 
 @Component
-public class UserServiceProxy {
-    @Value("${user.service.url}")
-    private String userUrl;
+@FeignClient(name = "user-service", url="${user.service.url}")
+public interface UserServiceProxy {
+    @PostMapping("/profile/create")
+    void createUserProfile(@Valid UserIdentificationDTO userIdentificationDTO);
 
-    private final RestTemplate restTemplate;
-
-    @Autowired
-    public UserServiceProxy(RestTemplate restTemplate) {
-        this.restTemplate = restTemplate;
-    }
-
-    public void createUserProfile(UUID id, String username, String email) {
-        String createProfileUrl = userUrl + "/profile/create";
-        UserIdentificationDTO dto = new UserIdentificationDTO(id, username, email);
-
-        ResponseEntity<String> response = restTemplate.postForEntity(createProfileUrl, dto, String.class);
-
-        if (response.getStatusCode() != HttpStatus.CREATED) {
-            throw new RuntimeException("Error creating user profile: " + dto);
-        }
-    }
-
-    public void deleteUserProfile(UUID id, String username, String email) {
-        String deleteProfileUrl = userUrl + "/profile/delete";
-        UserIdentificationDTO dto = new UserIdentificationDTO(id, username, email);
-
-        ResponseEntity<String> response = restTemplate.postForEntity(deleteProfileUrl, dto, String.class);
-
-        if (response.getStatusCode() != HttpStatus.OK) {
-            throw new RuntimeException("Error deleting user profile: " + dto);
-        }
-    }
-
+    @PostMapping("/profile/delete")
+    void deleteUserProfile(@Valid UserIdentificationDTO userIdentificationDTO);
 }
