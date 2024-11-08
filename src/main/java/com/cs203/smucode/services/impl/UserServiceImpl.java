@@ -1,5 +1,6 @@
 package com.cs203.smucode.services.impl;
 
+import com.cs203.smucode.dto.UserIdentificationDTO;
 import com.cs203.smucode.proxies.UserServiceProxy;
 import com.cs203.smucode.services.IUserService;
 import com.cs203.smucode.models.User;
@@ -13,8 +14,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
-import java.util.UUID;
-
 /**
  * @author: gav
  * @version: 1.0
@@ -46,13 +45,14 @@ public class UserServiceImpl implements IUserService {
     @Transactional
     public void createUser(User user) {
         user.setPassword(passwordEncoder.encode(user.getPassword()));
-        userRepository.save(user);
+        User createdUser = userRepository.save(user);
 
         // Talk to user service to create a profile for this user
         userServiceProxy.createUserProfile(
-                user.getId(),
-                user.getUsername(),
-                user.getEmail()
+                new UserIdentificationDTO(createdUser.getId(),
+                        createdUser.getUsername(),
+                        createdUser.getEmail()
+                )
         );
     }
 
@@ -79,7 +79,12 @@ public class UserServiceImpl implements IUserService {
         if (!passwordEncoder.matches(password, user.getPassword())) {
             throw new BadCredentialsException("Invalid password");
         }
-        userServiceProxy.deleteUserProfile(user.getId(), user.getUsername(), user.getEmail());
+        userServiceProxy.deleteUserProfile(
+                new UserIdentificationDTO(user.getId(),
+                        user.getUsername(),
+                        user.getEmail()
+                )
+        );
         userRepository.deleteByUsername(username);
     }
 }
