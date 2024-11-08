@@ -22,6 +22,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -31,7 +32,6 @@ import org.springframework.web.client.ResourceAccessException;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -183,13 +183,11 @@ public class AuthController {
     }
 
     @DeleteMapping("/delete-account")
-    public ResponseEntity<String> deleteAccount(@RequestBody @Valid LoginRequestDTO dto) {
-        if (dto.username() == null) {
-            throw new ApiRequestException("Username cannot be null or empty");
-        }
+    public ResponseEntity<String> deleteAccount(@RequestBody @Valid DeleteAccountRequestDTO dto) {
 
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         try {
-            userService.deleteUser(dto.username(), dto.password());
+            userService.deleteUser(authentication.getName(), dto.password());
             return ResponseEntity.ok("User deleted successfully");
         } catch (Exception e) {
             throw new ApiRequestException("An error occurred during delete account");
@@ -197,7 +195,7 @@ public class AuthController {
     }
 
     @PutMapping("/change-password")
-    public ResponseEntity<String> resetPassword(@RequestBody @Valid UserCredentialsDTO dto) {
+    public ResponseEntity<String> resetPassword(@RequestBody @Valid PasswordChangeRequestDTO dto) {
 
         if (dto.username() == null) {
             throw new ApiRequestException("Username cannot be null or empty");
