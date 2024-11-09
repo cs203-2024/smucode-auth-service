@@ -31,7 +31,7 @@ jobs:
 
       - name: Set environment variables
         run: |
-          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+          if [[ "${{ github.ref }}" == "refs/heads/prod" ]]; then
             echo "SPRING_PROFILE=prod" >> $GITHUB_ENV
             echo "DOCKER_TAG=prod" >> $GITHUB_ENV
           else
