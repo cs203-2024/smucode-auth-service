@@ -1,5 +1,6 @@
 package com.cs203.smucode.services.impl;
 
+import com.cs203.smucode.dto.UserIdentificationDTO;
 import com.cs203.smucode.models.User;
 import com.cs203.smucode.repositories.UserRepository;
 import com.cs203.smucode.proxies.UserServiceProxy;
@@ -90,7 +91,7 @@ class UserServiceImplTest {
         // Verify
         verify(passwordEncoder).encode("password");
         verify(userRepository).save(user);
-        verify(userServiceProxy).createUserProfile(user.getId(), user.getUsername(), user.getEmail());
+        verify(userServiceProxy).createUserProfile(any(UserIdentificationDTO.class));
     }
 
     @Test
@@ -182,7 +183,7 @@ class UserServiceImplTest {
         // Assert & Verify
         verify(userRepository).findByUsername(username);
         verify(passwordEncoder).matches(password, user.getPassword());
-        verify(userServiceProxy).deleteUserProfile(user.getId(), username, user.getEmail());
+        verify(userServiceProxy).deleteUserProfile(any(UserIdentificationDTO.class));
         verify(userRepository).deleteByUsername(username);
     }
 
