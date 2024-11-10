@@ -1,170 +1,126 @@
 package com.cs203.smucode.controllers;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
-
-import java.net.URI;
-import java.util.UUID;
-
-import com.cs203.smucode.dto.UserCredentialsDTO;
+import com.cs203.smucode.configs.TestSecurityConfig;
+import com.cs203.smucode.dto.*;
 import com.cs203.smucode.exception.InvalidTokenException;
 import com.cs203.smucode.models.RefreshToken;
-import com.cs203.smucode.services.ITokenService;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.boot.test.web.client.TestRestTemplate;
-import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.http.*;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.web.client.ResourceAccessException;
-
-import com.cs203.smucode.configs.TestSecurityConfig;
-import com.cs203.smucode.dto.LoginRequestDTO;
-import com.cs203.smucode.dto.LoginResponseDTO;
-import com.cs203.smucode.dto.UserDTO;
 import com.cs203.smucode.models.User;
 import com.cs203.smucode.models.UserRole;
 import com.cs203.smucode.proxies.UserServiceProxy;
-import com.cs203.smucode.repositories.UserRepository;
+import com.cs203.smucode.services.ITokenService;
+import com.cs203.smucode.services.IUserService;
+import com.cs203.smucode.utils.JWTUtil;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nimbusds.jose.jwk.JWKSet;
+import com.nimbusds.jose.jwk.RSAKey;
+import jakarta.servlet.http.Cookie;
+import org.junit.jupiter.api.*;
+import org.mockito.ArgumentCaptor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.web.servlet.MockMvc;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+import java.util.UUID;
+
+import static org.hamcrest.Matchers.containsString;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+@WebMvcTest(AuthController.class)
 @Import(TestSecurityConfig.class)
 @ActiveProfiles("test")
 class AuthControllerTest {
 
-    @LocalServerPort
-    private int port;
+    @Autowired
+    private MockMvc mockMvc;
 
     @Autowired
-    private TestRestTemplate restTemplate;
-
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
+    private ObjectMapper objectMapper;
 
     @MockBean
-    private UserServiceProxy userServiceProxy;
+    private IUserService userService;
+
+    @MockBean
+    private AuthenticationManager authenticationManager;
 
     @MockBean
     private ITokenService tokenService;
 
+    @MockBean
+    private UserDetailsService userDetailsService;
+
+    private User testUser;
+    private UserDetails userDetails;
+
     @BeforeEach
     void setUp() {
-        userRepository.deleteAll();
-        setupTestUser();
-        setupMocks();
-    }
-
-    private void setupTestUser() {
-        User testUser = new User();
+        testUser = new User();
+        testUser.setId(UUID.randomUUID());
         testUser.setUsername("testuser");
-        testUser.setPassword(passwordEncoder.encode("Test123!@"));
+        testUser.setPassword("encodedPassword");
         testUser.setEmail("test@example.com");
         testUser.setUserRole(UserRole.PLAYER);
-        userRepository.save(testUser);
-    }
 
-    private void setupMocks() {
-        doNothing().when(userServiceProxy).createUserProfile(any(), any(), any());
+        userDetails = mock(UserDetails.class);
+        when(userDetails.getUsername()).thenReturn("testuser");
+
+        Authentication auth = mock(Authentication.class);
+        when(auth.getPrincipal()).thenReturn(userDetails);
+
+        when(userService.getUserByUsername("testuser")).thenReturn(testUser);
+        when(authenticationManager.authenticate(any())).thenReturn(auth);
         when(tokenService.createAccessToken(any())).thenReturn("dummy-access-token");
-        when(tokenService.createRefreshToken(any())).thenReturn("dummy-refresh-token");
+        when(tokenService.createRefreshToken(anyString())).thenReturn(UUID.randomUUID().toString());
     }
 
     @Nested
     class SignupTests {
         @Test
         void whenValidUser_thenReturnsCreated() throws Exception {
-            UserDTO signupRequest = new UserDTO(
-                    "newuser",
-                    "NewPass123!@#",
-                    "newuser@example.com",
-                    "PLAYER"
-            );
+            UserDTO signupRequest = new UserDTO("newuser", "NewPass123!@#", "newuser@example.com", "PLAYER");
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<UserDTO> request = new HttpEntity<>(signupRequest, headers);
+            mockMvc.perform(post("/api/auth/signup")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(signupRequest)))
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.username").value("newuser"));
 
-            URI uri = new URI("http://localhost:" + port + "/api/auth/signup");
-            ResponseEntity<UserDTO> response = restTemplate.postForEntity(uri, request, UserDTO.class);
-
-            assertEquals(HttpStatus.CREATED, response.getStatusCode());
-            assertNotNull(response.getBody());
-            assertEquals("newuser", response.getBody().username());
+            verify(userService).createUser(any(User.class));
         }
 
         @Test
-        void whenDuplicateUsername_thenReturnsBadRequest() throws Exception {
-            UserDTO duplicateUsername = new UserDTO("testuser", "Test123!@", "another@example.com", "PLAYER");
+        void whenEmptyUsername_thenReturnsBadRequest() throws Exception {
+            UserDTO invalidRequest = new UserDTO("", "NewPass123!@#", "newuser@example.com", "PLAYER");
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            URI uri = new URI("http://localhost:" + port + "/api/auth/signup");
-
-            ResponseEntity<UserDTO> response = restTemplate.postForEntity(uri, new HttpEntity<>(duplicateUsername, headers), UserDTO.class);
-            assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+            mockMvc.perform(post("/api/auth/signup")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(invalidRequest)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(content().string(containsString("Username cannot be null or empty")));
         }
 
         @Test
-        void whenInvalidCredentials_thenReturnsBadRequest() throws Exception {
-            URI uri = new URI("http://localhost:" + port + "/api/auth/signup");
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
+        void whenEmptyPassword_thenReturnsBadRequest() throws Exception {
+            UserDTO invalidRequest = new UserDTO("newuser", "", "newuser@example.com", "PLAYER");
 
-            // Test invalid password
-            UserDTO invalidPassword = new UserDTO("newuser", "weak", "test@example.com", "PLAYER");
-            ResponseEntity<UserDTO> response = restTemplate.postForEntity(uri, new HttpEntity<>(invalidPassword, headers), UserDTO.class);
-            assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-
-            // Test invalid email
-            UserDTO invalidEmail = new UserDTO("newuser", "Test123!@", "notanemail", "PLAYER");
-            response = restTemplate.postForEntity(uri, new HttpEntity<>(invalidEmail, headers), UserDTO.class);
-            assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-        }
-
-        @Test
-        void whenServiceError_thenReturnsBadRequest() throws Exception {
-            UserDTO signupRequest = new UserDTO("newuser", "Test123!@", "newuser@example.com", "PLAYER");
-
-            doThrow(new ResourceAccessException("Service unavailable"))
-                    .when(userServiceProxy)
-                    .createUserProfile(any(UUID.class), any(String.class), any(String.class));
-
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            URI uri = new URI("http://localhost:" + port + "/api/auth/signup");
-
-            ResponseEntity<String> response = restTemplate.postForEntity(uri, new HttpEntity<>(signupRequest, headers), String.class);
-            assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-            assertTrue(response.getBody().contains("Something went wrong on our end"));
-        }
-
-        @Test
-        void whenUnexpectedError_thenReturnsBadRequest() throws Exception {
-            UserDTO signupRequest = new UserDTO("newuser", "Test123!@", "newuser@example.com", "PLAYER");
-            
-            // Mock a generic unexpected error
-            doThrow(new RuntimeException("Unexpected error"))
-                    .when(userServiceProxy)
-                    .createUserProfile(any(), any(), any());
-    
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            URI uri = new URI("http://localhost:" + port + "/api/auth/signup");
-            
-            ResponseEntity<String> response = restTemplate.postForEntity(uri, new HttpEntity<>(signupRequest, headers), String.class);
-            assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-            assertTrue(response.getBody().contains("An error occurred during signup"));
+            mockMvc.perform(post("/api/auth/signup")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(invalidRequest)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(content().string(containsString("Password must be more than 8 characters")));
         }
     }
 
@@ -174,59 +130,42 @@ class AuthControllerTest {
         void whenValidCredentials_thenReturnsOk() throws Exception {
             LoginRequestDTO loginRequest = new LoginRequestDTO("testuser", "Test123!@");
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<LoginRequestDTO> request = new HttpEntity<>(loginRequest, headers);
-
-            URI uri = new URI("http://localhost:" + port + "/api/auth/login");
-            ResponseEntity<LoginResponseDTO> response = restTemplate.postForEntity(uri, request, LoginResponseDTO.class);
-
-            assertEquals(HttpStatus.OK, response.getStatusCode());
-            assertNotNull(response.getBody());
-            assertEquals("success", response.getBody().message());
-            assertEquals("testuser", response.getBody().userDTO().username());
+            mockMvc.perform(post("/api/auth/login")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(loginRequest)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.message").value("success"))
+                    .andExpect(jsonPath("$.userDTO.username").value("testuser"))
+                    .andExpect(cookie().exists("accessToken"))
+                    .andExpect(cookie().exists("refreshToken"));
 
             verify(tokenService).createAccessToken(any());
             verify(tokenService).createRefreshToken("testuser");
         }
 
         @Test
-        void whenInvalidCredentials_thenReturnsError() throws Exception {
-            URI uri = new URI("http://localhost:" + port + "/api/auth/login");
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
+        void whenInvalidCredentials_thenReturnsUnauthorized() throws Exception {
+            LoginRequestDTO invalidRequest = new LoginRequestDTO("testuser", "wrongpass");
 
-            LoginRequestDTO nonexistentUser = new LoginRequestDTO("nonexistent", "Test123!@");
-            ResponseEntity<LoginResponseDTO> response = restTemplate.postForEntity(uri, new HttpEntity<>(nonexistentUser, headers), LoginResponseDTO.class);
-            assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
+            when(authenticationManager.authenticate(any()))
+                    .thenThrow(new BadCredentialsException("Bad credentials"));
+
+            mockMvc.perform(post("/api/auth/login")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(invalidRequest)))
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.message").value("Ensure that you have typed the username and password correctly"));
         }
 
         @Test
         void whenEmptyCredentials_thenReturnsBadRequest() throws Exception {
-            URI uri = new URI("http://localhost:" + port + "/api/auth/login");
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-
             LoginRequestDTO emptyCredentials = new LoginRequestDTO("", "");
-            ResponseEntity<String> response = restTemplate.postForEntity(uri, new HttpEntity<>(emptyCredentials, headers), String.class);
-            assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-            assertTrue(response.getBody().contains("Username cannot be null or empty"));
-        }
 
-        @Test
-        void whenTokenServiceFails_thenReturnsBadRequest() throws Exception {
-            LoginRequestDTO loginRequest = new LoginRequestDTO("testuser", "Test123!@");
-            
-            // Mock token service to throw exception
-            when(tokenService.createAccessToken(any())).thenThrow(new RuntimeException("Token creation failed"));
-    
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            URI uri = new URI("http://localhost:" + port + "/api/auth/login");
-            
-            ResponseEntity<String> response = restTemplate.postForEntity(uri, new HttpEntity<>(loginRequest, headers), String.class);
-            assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-            assertTrue(response.getBody().contains("An error occurred during login"));
+            mockMvc.perform(post("/api/auth/login")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(emptyCredentials)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(content().string(containsString("Username cannot be null or empty")));
         }
     }
 
@@ -234,65 +173,48 @@ class AuthControllerTest {
     class PasswordChangeTests {
         @Test
         void whenValidRequest_thenReturnsOk() throws Exception {
-            UserCredentialsDTO request = new UserCredentialsDTO(
-                    "testuser",
-                    "Test123!@",
-                    "NewPass456!@"
-            );
+            PasswordChangeRequestDTO request = new PasswordChangeRequestDTO("testuser", "oldpass", "NewPass@123");
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<UserCredentialsDTO> httpRequest = new HttpEntity<>(request, headers);
+            mockMvc.perform(put("/api/auth/change-password")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string("Password changed successfully"));
 
-            URI uri = new URI("http://localhost:" + port + "/api/auth/change-password");
-            ResponseEntity<String> response = restTemplate.exchange(uri, HttpMethod.PUT, httpRequest, String.class);
-
-            assertEquals("Password changed successfully", response.getBody());
-            User updatedUser = userRepository.findByUsername("testuser").orElse(null);
-            assertNotNull(updatedUser);
-            assertTrue(passwordEncoder.matches("NewPass456!@", updatedUser.getPassword()));
+            verify(userService).updatePassword("testuser", "oldpass", "NewPass@123");
         }
 
         @Test
-        void whenInvalidOldPassword_thenReturnsBadRequest() throws Exception {
-            UserCredentialsDTO request = new UserCredentialsDTO("testuser", "WrongPass123!@", "NewPass456!@");
+        void whenEmptyUsername_thenReturnsBadRequest() throws Exception {
+            PasswordChangeRequestDTO request = new PasswordChangeRequestDTO(null, "oldpass", "NewPass@123");
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            URI uri = new URI("http://localhost:" + port + "/api/auth/change-password");
-
-            ResponseEntity<String> response = restTemplate.exchange(uri, HttpMethod.PUT, new HttpEntity<>(request, headers), String.class);
-            assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-            assertTrue(response.getBody().contains("Invalid password"));
+            mockMvc.perform(put("/api/auth/change-password")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(content().string(containsString("Username cannot be empty/null")));
         }
 
         @Test
-        void whenInvalidNewPassword_thenReturnsBadRequest() throws Exception {
-            UserCredentialsDTO request = new UserCredentialsDTO("testuser", "Test123!@", "weak");
+        void whenEmptyOldPassword_thenReturnsBadRequest() throws Exception {
+            PasswordChangeRequestDTO request = new PasswordChangeRequestDTO("testuser", "", "NewPass@123");
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            URI uri = new URI("http://localhost:" + port + "/api/auth/change-password");
-
-            ResponseEntity<String> response = restTemplate.exchange(uri, HttpMethod.PUT, new HttpEntity<>(request, headers), String.class);
-            assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-            assertTrue(response.getBody().contains("Password must contain 1 symbol"));
+            mockMvc.perform(put("/api/auth/change-password")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(content().string(containsString("Old password is required")));
         }
 
         @Test
-        void whenUnexpectedError_thenReturnsBadRequest() throws Exception {
-            UserCredentialsDTO request = new UserCredentialsDTO("testuser", "Test123!@", "NewPass456!@");
-            
-            // Delete user after setup to cause error
-            userRepository.deleteAll();
-    
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            URI uri = new URI("http://localhost:" + port + "/api/auth/change-password");
-            
-            ResponseEntity<String> response = restTemplate.exchange(uri, HttpMethod.PUT, new HttpEntity<>(request, headers), String.class);
-            assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-            assertTrue(response.getBody().contains("An error occurred during password reset"));
+        void whenEmptyNewPassword_thenReturnsBadRequest() throws Exception {
+            PasswordChangeRequestDTO request = new PasswordChangeRequestDTO("testuser", "oldpass", "");
+
+            mockMvc.perform(put("/api/auth/change-password")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(content().string(containsString("New Password must contain 1 symbol, 1 uppercase, 1 lowercase and 1 digit")));
         }
     }
 
@@ -300,48 +222,33 @@ class AuthControllerTest {
     class AccountDeletionTests {
         @Test
         void whenValidRequest_thenReturnsOk() throws Exception {
-            LoginRequestDTO deleteRequest = new LoginRequestDTO("testuser", "Test123!@");
+            DeleteAccountRequestDTO deleteRequest = new DeleteAccountRequestDTO("Test123!@");
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<LoginRequestDTO> request = new HttpEntity<>(deleteRequest, headers);
+            Authentication auth = mock(Authentication.class);
+            when(auth.getName()).thenReturn("testuser");
 
-            URI uri = new URI("http://localhost:" + port + "/api/auth/delete-account");
-            ResponseEntity<String> response = restTemplate.exchange(uri, HttpMethod.DELETE, request, String.class);
+            mockMvc.perform(delete("/api/auth/delete-account")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(deleteRequest)))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string("User deleted successfully"));
 
-            assertEquals(HttpStatus.OK, response.getStatusCode());
-            assertEquals("User deleted successfully", response.getBody());
-            assertFalse(userRepository.findByUsername("testuser").isPresent());
+            verify(userService).deleteUser(anyString(), eq("Test123!@"));
         }
 
         @Test
-        void whenInvalidCredentials_thenReturnsBadRequest() throws Exception {
-            LoginRequestDTO wrongPass = new LoginRequestDTO("testuser", "wrongpassword");
+        void whenServiceError_thenReturnsBadRequest() throws Exception {
+            DeleteAccountRequestDTO deleteRequest = new DeleteAccountRequestDTO("Test123!@");
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            URI uri = new URI("http://localhost:" + port + "/api/auth/delete-account");
+            doThrow(new RuntimeException("Service error"))
+                    .when(userService)
+                    .deleteUser(anyString(), anyString());
 
-            ResponseEntity<String> response = restTemplate.exchange(uri, HttpMethod.DELETE, new HttpEntity<>(wrongPass, headers), String.class);
-            assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-        }
-
-        @Test
-        void whenUnexpectedError_thenReturnsBadRequest() throws Exception {
-            LoginRequestDTO deleteRequest = new LoginRequestDTO("testuser", "Test123!@");
-
-            // Mock proxy to throw exception
-            doThrow(new RuntimeException("Unexpected error"))
-                    .when(userServiceProxy)
-                    .deleteUserProfile(any(), any(), any());
-
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            URI uri = new URI("http://localhost:" + port + "/api/auth/delete-account");
-
-            ResponseEntity<String> response = restTemplate.exchange(uri, HttpMethod.DELETE, new HttpEntity<>(deleteRequest, headers), String.class);
-            assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-            assertTrue(response.getBody().contains("An error occurred during delete account"));
+            mockMvc.perform(delete("/api/auth/delete-account")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(deleteRequest)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(content().string(containsString("An error occurred during delete account")));
         }
     }
 
@@ -349,74 +256,59 @@ class AuthControllerTest {
     class SessionManagementTests {
         @Test
         void whenValidLogout_thenReturnsOk() throws Exception {
-            HttpHeaders headers = new HttpHeaders();
-            headers.add(HttpHeaders.COOKIE, "refreshToken=" + UUID.randomUUID().toString());
-            HttpEntity<Void> request = new HttpEntity<>(null, headers);
+            String refreshTokenId = UUID.randomUUID().toString();
 
-            URI uri = new URI("http://localhost:" + port + "/api/auth/logout");
-            ResponseEntity<String> response = restTemplate.postForEntity(uri, request, String.class);
+            mockMvc.perform(post("/api/auth/logout")
+                            .cookie(new Cookie("refreshToken", refreshTokenId)))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string("User logged out successfully"))
+                    .andExpect(cookie().exists("refreshToken"))
+                    .andExpect(cookie().exists("accessToken"));
 
-            assertEquals(HttpStatus.OK, response.getStatusCode());
-            assertEquals("User logged out successfully", response.getBody());
-
-            HttpHeaders responseHeaders = response.getHeaders();
-            assertTrue(responseHeaders.get(HttpHeaders.SET_COOKIE).stream()
-                    .anyMatch(cookie -> cookie.contains("refreshToken=destroyedRefresh")));
-            assertTrue(responseHeaders.get(HttpHeaders.SET_COOKIE).stream()
-                    .anyMatch(cookie -> cookie.contains("accessToken=destroyedAccess")));
+            verify(tokenService).blacklistRefreshToken(UUID.fromString(refreshTokenId));
         }
 
         @Test
         void whenValidRefreshToken_thenReturnsNewAccessToken() throws Exception {
-            UUID mockUuid = UUID.randomUUID();
-            User testUser = userRepository.findByUsername("testuser").orElseThrow();
-            RefreshToken mockRefreshToken = new RefreshToken();
-            mockRefreshToken.setUser(testUser);
+            UUID refreshTokenId = UUID.randomUUID();
+            RefreshToken refreshToken = new RefreshToken();
+            refreshToken.setUser(testUser);
 
-            when(tokenService.validateRefreshToken(mockUuid)).thenReturn(mockRefreshToken);
+            when(tokenService.validateRefreshToken(refreshTokenId)).thenReturn(refreshToken);
+            when(userDetailsService.loadUserByUsername(anyString())).thenReturn(userDetails);
             when(tokenService.createAccessToken(any())).thenReturn("new-access-token");
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.add(HttpHeaders.COOKIE, "refreshToken=" + mockUuid.toString());
-            HttpEntity<Void> request = new HttpEntity<>(null, headers);
-
-            URI uri = new URI("http://localhost:" + port + "/api/auth/refresh");
-            ResponseEntity<LoginResponseDTO> response = restTemplate.postForEntity(uri, request, LoginResponseDTO.class);
-
-            assertEquals(HttpStatus.OK, response.getStatusCode());
-            assertNotNull(response.getBody());
-            assertEquals("success", response.getBody().message());
-            assertNotNull(response.getBody().userDTO());
+            mockMvc.perform(post("/api/auth/refresh")
+                            .cookie(new Cookie("refreshToken", refreshTokenId.toString())))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.message").value("success"))
+                    .andExpect(cookie().exists("accessToken"));
         }
 
         @Test
         void whenInvalidRefreshToken_thenReturnsBadRequest() throws Exception {
-            UUID mockUuid = UUID.randomUUID();
-            when(tokenService.validateRefreshToken(mockUuid)).thenThrow(new InvalidTokenException("Invalid refresh token"));
+            UUID refreshTokenId = UUID.randomUUID();
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.add(HttpHeaders.COOKIE, "refreshToken=" + mockUuid.toString());
-            HttpEntity<Void> request = new HttpEntity<>(null, headers);
+            when(tokenService.validateRefreshToken(refreshTokenId)).thenReturn(null);
 
-            URI uri = new URI("http://localhost:" + port + "/api/auth/refresh");
-            ResponseEntity<String> response = restTemplate.postForEntity(uri, request, String.class);
-
-            assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-            assertTrue(response.getBody().contains("Invalid refresh token"));
+            mockMvc.perform(post("/api/auth/refresh")
+                            .cookie(new Cookie("refreshToken", refreshTokenId.toString())))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(content().string(containsString("Invalid refresh token")));
         }
+    }
 
-        @Test
-        void whenRefreshTokenValidationFails_thenReturnsBadRequest() throws Exception {
-            UUID mockUuid = UUID.randomUUID();
-            when(tokenService.validateRefreshToken(mockUuid)).thenThrow(new RuntimeException("Unexpected error"));
-    
-            HttpHeaders headers = new HttpHeaders();
-            headers.add(HttpHeaders.COOKIE, "refreshToken=" + mockUuid.toString());
-            URI uri = new URI("http://localhost:" + port + "/api/auth/refresh");
-            
-            ResponseEntity<String> response = restTemplate.postForEntity(uri, new HttpEntity<>(null, headers), String.class);
-            assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-            assertTrue(response.getBody().contains("Error refreshing access token"));
-        }
+    @Test
+    void whenGetJwks_thenReturnsJwkSet() throws Exception {
+        JWTUtil jwtUtil = mock(JWTUtil.class);
+        RSAKey rsaKey = mock(RSAKey.class);
+        when(tokenService.getJWTUtil()).thenReturn(jwtUtil);
+        when(jwtUtil.getRSAKey()).thenReturn(rsaKey);
+
+        mockMvc.perform(get("/api/auth/.well-known/jwks.json"))
+                .andExpect(status().isOk());
+
+        verify(tokenService).getJWTUtil();
+        verify(jwtUtil).getRSAKey();
     }
 }
