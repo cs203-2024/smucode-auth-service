@@ -172,6 +172,7 @@
 					<!-- Global configuration for all executions -->
 					<excludes>
 						<exclude>**/exception/**/*</exclude>
+						<exclude>**/configs/**/*</exclude>
 						<exclude>**/dto/**/*</exclude>
 						<exclude>**/proxies/**/*</exclude>
 						<exclude>**/models/**/*</exclude>
