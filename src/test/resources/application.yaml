@@ -1,21 +1,17 @@
 server:
   port: 8000
 
+user:
+  service:
+    url: ${USER_SERVICE_URL:http://localhost:8080/api/users}
+
 spring:
   application:
     name: auth-service
 
 eureka:
   client:
-    enabled: true
-    registerWithEureka: true
-    fetchRegistry: true
-    serviceUrl:
-      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://localhost:8761/eureka/}
-
-user:
-  service:
-    url: ${USER_SERVICE_URL:http://localhost:8080/api/users}
+    enabled: false
 
 https:
   enabled: ${HTTPS_ENABLED:false}
