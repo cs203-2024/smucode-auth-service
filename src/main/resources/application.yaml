@@ -16,6 +16,10 @@ eureka:
 https:
   enabled: ${HTTPS_ENABLED:false}
 
+user:
+  service:
+    url: ${USER_SERVICE_URL:http://localhost:8080/api/users}
+
 feign:
   access:
     token: ${FEIGN_ACCESS_TOKEN:write_your_access_token}
