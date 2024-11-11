@@ -4,6 +4,14 @@ server:
 spring:
   application:
     name: auth-service
+  datasource:
+    type: com.zaxxer.hikari.HikariDataSource
+    driver-class-name: org.postgresql.Driver
+    username: postgres
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    open-in-view: false
 
 eureka:
   client:
