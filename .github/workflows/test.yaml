@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - '**' # Triggers on push to any branch
+      - '!dev' # Except dev branch
   pull_request:
     branches:
       - dev # Triggers on pull request to dev branch
