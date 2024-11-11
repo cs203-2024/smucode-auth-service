@@ -13,10 +13,6 @@ eureka:
     serviceUrl:
       defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://localhost:8761/eureka/}
 
-user:
-  service:
-    url: ${USER_SERVICE_URL:http://localhost:8080/api/users}
-
 https:
   enabled: ${HTTPS_ENABLED:false}
 
