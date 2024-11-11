@@ -32,4 +32,4 @@ jobs:
             ${{ runner.os }}-maven-
 
       - name: Run tests
-        run: mvn test
+        run: mvn test -Dspring.profiles.active=${{ env.SPRING_PROFILE }} -Dfeign.access.token=${{ secrets.FEIGN_ACCESS_TOKEN}}
